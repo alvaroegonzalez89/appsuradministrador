@@ -738,7 +738,7 @@ function actualizarMetricas() {
   const activos = clientes.filter(c=>c.estado==="activo").length;
   const vencen = clientes.filter(c=>c.estado==="vence").length;
   const sistemas = [...new Set(clientes.filter(c=>c.sistema).map(c=>c.sistema))];
-  const ingresos = clientes.filter(c=>c.estado==="activo"&&c.monto).reduce((a,c)=>a+Number(c.monto),0);
+  const ingresos = clientes.filter(c=>c.estado==="activo"&&c.monto&&c.mensualEstado==="pagado").reduce((a,c)=>a+Number(c.monto),0);
 
   document.getElementById("met-activos").textContent = activos;
   document.getElementById("met-activos-sub").textContent = clientes.length + " clientes en total";
