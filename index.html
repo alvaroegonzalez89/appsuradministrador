@@ -434,7 +434,7 @@ td { padding: 13px 16px; font-size: 13px; color: var(--texto); vertical-align: m
       <div class="content">
 
         <!-- MÉTRICAS -->
-        <div class="metricas">
+        <div class="metricas" style="grid-template-columns:repeat(5,1fr);">
           <div class="metrica">
             <div class="met-label">Clientes activos</div>
             <div class="met-val" id="met-activos">—</div>
@@ -446,14 +446,19 @@ td { padding: 13px 16px; font-size: 13px; color: var(--texto); vertical-align: m
             <div class="met-sub" id="met-sistemas-sub">—</div>
           </div>
           <div class="metrica">
-            <div class="met-label">Vencen este mes</div>
-            <div class="met-val" id="met-vencen">—</div>
-            <div class="met-sub warn" id="met-vencen-sub">—</div>
+            <div class="met-label">Setup cobrado</div>
+            <div class="met-val" id="met-setup">—</div>
+            <div class="met-sub ok" id="met-setup-sub">Pagado + parcial</div>
           </div>
           <div class="metrica">
-            <div class="met-label">Ingreso mensual</div>
+            <div class="met-label">Mensual cobrado</div>
             <div class="met-val" id="met-ingresos">—</div>
-            <div class="met-sub ok" id="met-ingresos-sub">Total activos</div>
+            <div class="met-sub ok" id="met-ingresos-sub">Solo mensualidades cobradas</div>
+          </div>
+          <div class="metrica" style="border:2px solid #0f2d5e;">
+            <div class="met-label" style="color:#0f2d5e;">Total cobrado</div>
+            <div class="met-val" id="met-total">—</div>
+            <div class="met-sub ok" id="met-total-sub">Setup + mensual</div>
           </div>
         </div>
 
@@ -738,15 +743,34 @@ function actualizarMetricas() {
   const activos = clientes.filter(c=>c.estado==="activo").length;
   const vencen = clientes.filter(c=>c.estado==="vence").length;
   const sistemas = [...new Set(clientes.filter(c=>c.sistema).map(c=>c.sistema))];
-  const ingresos = clientes.filter(c=>c.estado==="activo"&&c.monto&&c.mensualEstado==="pagado").reduce((a,c)=>a+Number(c.monto),0);
+
+  // Setup cobrado: suma setupMonto de los que tienen setupEstado pagado o parcial
+  const setup = clientes
+    .filter(c=>c.setupMonto && (c.setupEstado==="pagado" || c.setupEstado==="parcial"))
+    .reduce((a,c)=>a+Number(c.setupMonto),0);
+
+  // Mensual cobrado: solo los marcados como pagado
+  const mensual = clientes
+    .filter(c=>c.monto && c.mensualEstado==="pagado")
+    .reduce((a,c)=>a+Number(c.monto),0);
+
+  const total = setup + mensual;
+
+  function fmt(n) {
+    if(n===0) return "$0";
+    if(n>=1000000) return "$"+( n/1000000).toFixed(1).replace(".0","")+"M";
+    if(n>=1000)    return "$"+Math.round(n/1000)+"k";
+    return "$"+n.toLocaleString("es-AR");
+  }
 
   document.getElementById("met-activos").textContent = activos;
   document.getElementById("met-activos-sub").textContent = clientes.length + " clientes en total";
   document.getElementById("met-sistemas").textContent = sistemas.length;
   document.getElementById("met-sistemas-sub").textContent = sistemas.slice(0,2).join(" · ") + (sistemas.length>2?" y más":"");
-  document.getElementById("met-vencen").textContent = vencen;
-  document.getElementById("met-vencen-sub").textContent = vencen > 0 ? "Renovar pronto" : "Todo al día";
-  document.getElementById("met-ingresos").textContent = ingresos > 0 ? "$"+Math.round(ingresos/1000)+"k" : "$0";
+  document.getElementById("met-setup").textContent = fmt(setup);
+  document.getElementById("met-ingresos").textContent = fmt(mensual);
+  document.getElementById("met-total").textContent = fmt(total);
+  document.getElementById("met-total-sub").textContent = "Setup " + fmt(setup) + " + Mensual " + fmt(mensual);
   document.getElementById("badge-alertas").textContent = vencen;
   document.getElementById("badge-alertas").style.display = vencen > 0 ? "" : "none";
 }
