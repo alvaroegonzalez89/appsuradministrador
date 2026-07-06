@@ -302,6 +302,31 @@ td { padding: 13px 16px; font-size: 13px; color: var(--texto); vertical-align: m
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .hidden { display: none !important; }
+
+/* COBROS */
+.cobros-mini { display: flex; flex-direction: column; gap: 5px; }
+.cobro-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.cobro-label { color: #64748b; width: 52px; flex-shrink: 0; }
+.cobro-monto { font-weight: 600; color: #0f172a; }
+.cobro-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 100px; font-size: 10px; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; }
+.cobro-badge.pagado { background: #dcfce7; color: #15803d; }
+.cobro-badge.pendiente { background: #fee2e2; color: #991b1b; }
+.cobro-badge.parcial { background: #fef3c7; color: #92400e; }
+.cobro-badge:hover { opacity: 0.8; transform: scale(0.97); }
+
+/* MODAL COBRO */
+.modal-cobro { width: 380px; }
+.cobro-opciones { display: flex; flex-direction: column; gap: 10px; margin: 4px 0; }
+.cobro-opcion {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+  cursor: pointer; transition: all 0.15s;
+}
+.cobro-opcion:hover { border-color: #0f2d5e; background: #f0f5ff; }
+.cobro-opcion.selected { border-color: #0f2d5e; background: #eff6ff; }
+.cobro-opcion-icon { font-size: 22px; }
+.cobro-opcion-info strong { display: block; font-size: 13px; font-weight: 700; color: #0f172a; }
+.cobro-opcion-info span { font-size: 12px; color: #64748b; }
 </style>
 </head>
 <body>
@@ -465,13 +490,13 @@ td { padding: 13px 16px; font-size: 13px; color: var(--texto); vertical-align: m
                 <th>Sistema</th>
                 <th>Estado</th>
                 <th>Vencimiento</th>
-                <th>Monto/mes</th>
+                <th>Cobros</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tbody-clientes">
               <tr>
-                <td colspan="6">
+                <td colspan="7">
                   <div class="empty-state">
                     <i class="ti ti-loader" aria-hidden="true"></i>
                     Cargando clientes...
@@ -532,8 +557,30 @@ td { padding: 13px 16px; font-size: 13px; color: var(--texto); vertical-align: m
         </div>
         <div class="mf">
           <label>Monto mensual (ARS)</label>
-          <input type="number" id="f-monto" placeholder="150000">
+          <input type="number" id="f-monto" placeholder="30000">
         </div>
+      </div>
+      <div class="form-row2">
+        <div class="mf">
+          <label>Monto setup (ARS)</label>
+          <input type="number" id="f-setup-monto" placeholder="150000">
+        </div>
+        <div class="mf">
+          <label>Estado setup</label>
+          <select id="f-setup-estado">
+            <option value="pendiente">✗ Pendiente</option>
+            <option value="parcial">½ Parcial</option>
+            <option value="pagado">✓ Pagado</option>
+          </select>
+        </div>
+      </div>
+      <div class="mf">
+        <label>Estado mensualidad</label>
+        <select id="f-mensual-estado">
+          <option value="pendiente">✗ Pendiente</option>
+          <option value="parcial">½ Parcial</option>
+          <option value="pagado">✓ Pagado</option>
+        </select>
       </div>
       <div class="form-row2">
         <div class="mf">
@@ -646,7 +693,7 @@ function renderTabla() {
   const tbody = document.getElementById("tbody-clientes");
 
   if(filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ti ti-users" aria-hidden="true"></i>No hay clientes que coincidan</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><i class="ti ti-users" aria-hidden="true"></i>No hay clientes que coincidan</div></td></tr>`;
     return;
   }
 
@@ -736,6 +783,9 @@ function abrirModal(modo="nuevo", data=null) {
   document.getElementById("f-rubro").value = data?.rubro || "";
   document.getElementById("f-email").value = data?.email || "";
   document.getElementById("f-uid").value = data?.uid || "";
+  document.getElementById("f-setup-monto").value = data?.setupMonto || "";
+  document.getElementById("f-setup-estado").value = data?.setupEstado || "pendiente";
+  document.getElementById("f-mensual-estado").value = data?.mensualEstado || "pendiente";
   document.getElementById("f-telefono").value = data?.telefono || "";
   document.getElementById("f-sistema").value = data?.sistema || "";
   document.getElementById("f-monto").value = data?.monto || "";
@@ -775,6 +825,9 @@ document.getElementById("modal-guardar").addEventListener("click", async () => {
     nombre,
     email,
     uid,
+    setupMonto:   Number(document.getElementById("f-setup-monto").value) || 0,
+    setupEstado:  document.getElementById("f-setup-estado").value,
+    mensualEstado:document.getElementById("f-mensual-estado").value,
     rubro:      document.getElementById("f-rubro").value.trim(),
     telefono:   document.getElementById("f-telefono").value.trim(),
     sistema,
@@ -939,5 +992,95 @@ document.querySelectorAll(".sb-item[data-view]").forEach(btn => {
   });
 });
 </script>
+
+<!-- ═══ MODAL COBRO ═══ -->
+<div class="modal-bg hidden" id="modal-cobro-bg">
+  <div class="modal modal-cobro">
+    <div class="modal-head">
+      <h3 id="cobro-titulo">Actualizar cobro</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-cobro-bg').classList.add('hidden')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cobro-cliente-id">
+      <input type="hidden" id="cobro-tipo">
+      <p style="font-size:13px;color:#64748b;margin-bottom:4px;" id="cobro-desc">Seleccioná el estado del cobro:</p>
+      <div class="cobro-opciones">
+        <div class="cobro-opcion" onclick="seleccionarCobro('pendiente')">
+          <span class="cobro-opcion-icon">✗</span>
+          <div class="cobro-opcion-info">
+            <strong>Pendiente</strong>
+            <span>No se cobró todavía</span>
+          </div>
+        </div>
+        <div class="cobro-opcion" onclick="seleccionarCobro('parcial')">
+          <span class="cobro-opcion-icon">½</span>
+          <div class="cobro-opcion-info">
+            <strong>Parcial</strong>
+            <span>Se cobró una parte</span>
+          </div>
+        </div>
+        <div class="cobro-opcion" onclick="seleccionarCobro('pagado')">
+          <span class="cobro-opcion-icon">✓</span>
+          <div class="cobro-opcion-info">
+            <strong>Pagado</strong>
+            <span>Cobro completo recibido</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── MODAL COBRO ──
+function abrirModalCobro(clienteId, tipo) {
+  const c = clientes.find(x=>x.id===clienteId);
+  if(!c) return;
+  document.getElementById("cobro-cliente-id").value = clienteId;
+  document.getElementById("cobro-tipo").value = tipo;
+  const monto = tipo==="setup" ? formatMonto(c.setupMonto) : formatMonto(c.monto);
+  document.getElementById("cobro-titulo").textContent = tipo==="setup" ? "Setup — "+c.nombre : "Mensualidad — "+c.nombre;
+  document.getElementById("cobro-desc").textContent = (tipo==="setup" ? "Setup " : "Mensualidad ") + monto + " — seleccioná el estado:";
+  // Marcar la opción actual
+  const estadoActual = tipo==="setup" ? (c.setupEstado||"pendiente") : (c.mensualEstado||"pendiente");
+  document.querySelectorAll(".cobro-opcion").forEach(el => el.classList.remove("selected"));
+  const opciones = document.querySelectorAll(".cobro-opcion");
+  const idx = ["pendiente","parcial","pagado"].indexOf(estadoActual);
+  if(idx>=0) opciones[idx].classList.add("selected");
+  document.getElementById("modal-cobro-bg").classList.remove("hidden");
+}
+
+async function seleccionarCobro(estado) {
+  const clienteId = document.getElementById("cobro-cliente-id").value;
+  const tipo = document.getElementById("cobro-tipo").value;
+  const campo = tipo==="setup" ? "setupEstado" : "mensualEstado";
+
+  // Marcar visualmente
+  document.querySelectorAll(".cobro-opcion").forEach(el => el.classList.remove("selected"));
+  const idx = ["pendiente","parcial","pagado"].indexOf(estado);
+  document.querySelectorAll(".cobro-opcion")[idx].classList.add("selected");
+
+  try {
+    if(!modoDemo) {
+      await db.collection("clientes").doc(clienteId).update({ [campo]: estado });
+    } else {
+      const c = clientes.find(x=>x.id===clienteId);
+      if(c) c[campo] = estado;
+      renderTabla();
+      actualizarMetricas();
+    }
+    showToast("Cobro actualizado");
+    document.getElementById("modal-cobro-bg").classList.add("hidden");
+  } catch(e) {
+    showToast("Error al guardar: "+e.message, "err");
+  }
+}
+
+document.getElementById("modal-cobro-bg").addEventListener("click", e => {
+  if(e.target===document.getElementById("modal-cobro-bg"))
+    document.getElementById("modal-cobro-bg").classList.add("hidden");
+});
+</script>
+
 </body>
 </html>
